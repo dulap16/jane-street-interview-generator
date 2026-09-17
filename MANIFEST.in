@@ -1,0 +1,12 @@
+include README.md
+include DEVELOPMENT.md
+include .gitignore
+recursive-include docs *.md
+recursive-include demos *.json *.py *.cpp *.md
+recursive-include scripts *.py
+recursive-include tests *.py
+recursive-include .claude/skills *.md
+recursive-include .claude/agents *.md
+global-exclude __pycache__ *.py[cod]
+prune .interview-lab
+prune .venv

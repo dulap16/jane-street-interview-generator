@@ -1,0 +1,261 @@
+{
+  "schema": 1,
+  "id": "parcel-bay-ledger",
+  "title": "Parcel bay reservation ledger — familiar demo",
+  "family": "simulation",
+  "origin": {"kind": "demo", "seed": "parcel-ledger-demo-v1"},
+  "interface": {
+    "constructor": [{"name": "capacities", "type": {"map": "int"}}],
+    "methods": [
+      {"name": "reserve", "params": [{"name": "reservation_id", "type": "str"}, {"name": "bay", "type": "str"}, {"name": "units", "type": "int"}], "returns": "bool", "since": 1},
+      {"name": "remaining", "params": [{"name": "bay", "type": "str"}], "returns": "int", "since": 1},
+      {"name": "cancel", "params": [{"name": "reservation_id", "type": "str"}], "returns": "bool", "since": 2},
+      {"name": "allocation", "params": [{"name": "reservation_id", "type": "str"}], "returns": {"optional": {"map": "int"}}, "since": 2},
+      {"name": "replace", "params": [{"name": "cancel_ids", "type": {"list": "str"}}, {"name": "new_ids", "type": {"list": "str"}}, {"name": "bays", "type": {"list": "str"}}, {"name": "units", "type": {"list": "int"}}], "returns": "bool", "since": 3}
+    ]
+  },
+  "parts": [
+    {
+      "title": "Reserve a parcel bay",
+      "prompt": "Implement class Solution for a parcel depot that reserves whole storage units in named bays. The constructor receives capacities: map[str,int], with nonnegative signed-64-bit capacities; copy the input rather than modifying it. Empty capacity maps and zero-capacity bays are valid. Bay names are exact strings, including empty strings. reserve(reservation_id: str, bay: str, units: int) -> bool accepts a nonempty ID and a positive number of units. IDs are case-sensitive, whitespace is allowed, and an ID can be active in only one bay. Validate in this order: (1) empty ID or nonpositive units: invalid_argument; (2) unknown bay: out_of_range; (3) already-active ID: invalid_argument. Otherwise return false if that bay lacks space, or reserve all requested units and return true. A false result does not consume the ID. remaining(bay: str) -> int returns unreserved units; an unknown bay raises out_of_range. Every false result or specified exception leaves all state unchanged. Python raises ValueError for invalid_argument and KeyError or IndexError for out_of_range; C++ uses the corresponding standard exceptions. A negative constructor capacity is invalid_argument. Inputs already satisfy the declared types. No concurrency, persistence, or performance trick is required: explain the costs of the data structures you choose. Example: capacities {'blue': 5}; reserve('p1','blue',3) is true; remaining('blue') is 2; reserve('p2','blue',3) is false; remaining('blue') is still 2.",
+      "public": [
+        {"id": "p1-public-capacity", "constructor": [{"blue": 5, "green": 2}], "commands": [
+          {"method": "remaining", "args": ["blue"], "expect": 5},
+          {"method": "reserve", "args": ["p1", "blue", 3], "expect": true},
+          {"method": "remaining", "args": ["blue"], "expect": 2},
+          {"method": "reserve", "args": ["p2", "blue", 3], "expect": false},
+          {"method": "remaining", "args": ["blue"], "expect": 2},
+          {"method": "reserve", "args": ["p2", "green", 2], "expect": true},
+          {"method": "remaining", "args": ["green"], "expect": 0}
+        ]},
+        {"id": "p1-public-errors", "constructor": [{"blue": 2}], "commands": [
+          {"method": "reserve", "args": ["a", "blue", 1], "expect": true},
+          {"method": "reserve", "args": ["a", "blue", 1], "raises": "invalid_argument"},
+          {"method": "reserve", "args": ["b", "missing", 1], "raises": "out_of_range"},
+          {"method": "reserve", "args": ["", "blue", 1], "raises": "invalid_argument"},
+          {"method": "reserve", "args": ["b", "blue", 0], "raises": "invalid_argument"},
+          {"method": "remaining", "args": ["blue"], "expect": 1}
+        ]}
+      ],
+      "hidden": [
+        {"id": "p1-hidden-empty", "constructor": [{}], "commands": [
+          {"method": "remaining", "args": ["missing"], "raises": "out_of_range"},
+          {"method": "reserve", "args": ["x", "missing", 1], "raises": "out_of_range"},
+          {"method": "reserve", "args": ["", "missing", 0], "raises": "invalid_argument"}
+        ]},
+        {"id": "p1-hidden-boundaries", "constructor": [{"zero": 0, "huge": 9223372036854775807}], "commands": [
+          {"method": "reserve", "args": ["x", "zero", 1], "expect": false},
+          {"method": "remaining", "args": ["zero"], "expect": 0},
+          {"method": "reserve", "args": ["x", "huge", 9223372036854775807], "expect": true},
+          {"method": "remaining", "args": ["huge"], "expect": 0},
+          {"method": "reserve", "args": ["y", "huge", 1], "expect": false},
+          {"method": "reserve", "args": ["y", "zero", -9223372036854775808], "raises": "invalid_argument"},
+          {"method": "remaining", "args": ["huge"], "expect": 0}
+        ]},
+        {"id": "p1-hidden-identifiers", "constructor": [{"": 4, "北": 4}], "commands": [
+          {"method": "reserve", "args": [" ", "", 2], "expect": true},
+          {"method": "reserve", "args": ["Box", "北", 1], "expect": true},
+          {"method": "reserve", "args": ["box", "北", 2], "expect": true},
+          {"method": "reserve", "args": ["Box", "", 1], "raises": "invalid_argument"},
+          {"method": "remaining", "args": [""], "expect": 2},
+          {"method": "remaining", "args": ["北"], "expect": 1}
+        ]},
+        {"id": "p1-hidden-precedence", "constructor": [{"a": 3}], "commands": [
+          {"method": "reserve", "args": ["x", "a", 2], "expect": true},
+          {"method": "reserve", "args": ["x", "missing", 1], "raises": "out_of_range"},
+          {"method": "reserve", "args": ["x", "missing", -1], "raises": "invalid_argument"},
+          {"method": "reserve", "args": ["x", "a", 99], "raises": "invalid_argument"},
+          {"method": "remaining", "args": ["a"], "expect": 1}
+        ]}
+      ],
+      "invariants": [
+        "For every bay, remaining equals its initial capacity minus the sum of units in active reservations for that bay, and stays between zero and capacity.",
+        "Each active reservation ID identifies exactly one bay and one positive unit count; IDs are globally unique, not unique merely within a bay.",
+        "Rejected or exceptional operations change neither availability nor the active-ID set; a capacity rejection does not burn an ID.",
+        "Reservations in one bay cannot reduce another bay's remaining units. Inputs and return values never expose mutable internal state."
+      ],
+      "hints": [
+        "What information must you remember to check the ID rule separately from the space rule?",
+        "Consider one lookup from bay to available units and another from active ID to its reservation. Check every rejection before updating either.",
+        "Validate the ID and units, then bay existence, then ID uniqueness. If enough space remains, subtract units and store the ID; otherwise return false without changing either lookup."
+      ],
+      "failure_question": "After a rejected operation, which facts about IDs and available space should still be exactly as they were?"
+    },
+    {
+      "title": "Cancel and inspect reservations",
+      "prompt": "Keep all prior behavior. Add cancel(reservation_id: str) -> bool and allocation(reservation_id: str) -> optional[map[str,int]]. Both raise invalid_argument for an empty ID without changing state. cancel returns false for a nonempty unknown ID; otherwise it removes that reservation, restores exactly its units to its bay, and returns true. An ID becomes reusable after cancellation. Repeated cancellation must not restore units twice. allocation returns null/None/std::nullopt for a nonempty unknown ID, or a fresh one-entry map {bay: units} for an active reservation. Querying does not change state, and mutating a returned map must not change the ledger. Example: capacities {'blue':5}; reserve('x','blue',3) is true; allocation('x') is {'blue':3}; cancel('x') is true; remaining('blue') is 5; cancel('x') is false; allocation('x') is null. Discuss the cost of the extension; a simple adequate initial solution was entirely appropriate.",
+      "public": [
+        {"id": "p2-public-cancel", "constructor": [{"blue": 5}], "commands": [
+          {"method": "reserve", "args": ["x", "blue", 3], "expect": true},
+          {"method": "allocation", "args": ["x"], "expect": {"blue": 3}},
+          {"method": "cancel", "args": ["x"], "expect": true},
+          {"method": "remaining", "args": ["blue"], "expect": 5},
+          {"method": "cancel", "args": ["x"], "expect": false},
+          {"method": "allocation", "args": ["x"], "expect": null},
+          {"method": "remaining", "args": ["blue"], "expect": 5}
+        ]},
+        {"id": "p2-public-reuse", "constructor": [{"a": 4, "b": 2}], "commands": [
+          {"method": "reserve", "args": ["x", "a", 4], "expect": true},
+          {"method": "cancel", "args": ["x"], "expect": true},
+          {"method": "reserve", "args": ["x", "b", 2], "expect": true},
+          {"method": "allocation", "args": ["x"], "expect": {"b": 2}},
+          {"method": "remaining", "args": ["a"], "expect": 4},
+          {"method": "cancel", "args": [""], "raises": "invalid_argument"},
+          {"method": "allocation", "args": [""], "raises": "invalid_argument"},
+          {"method": "remaining", "args": ["b"], "expect": 0}
+        ]}
+      ],
+      "hidden": [
+        {"id": "p2-hidden-independent", "constructor": [{"a": 7, "b": 3}], "commands": [
+          {"method": "reserve", "args": ["x", "a", 2], "expect": true},
+          {"method": "reserve", "args": ["y", "a", 5], "expect": true},
+          {"method": "reserve", "args": ["z", "b", 3], "expect": true},
+          {"method": "cancel", "args": ["y"], "expect": true},
+          {"method": "allocation", "args": ["x"], "expect": {"a": 2}},
+          {"method": "allocation", "args": ["z"], "expect": {"b": 3}},
+          {"method": "remaining", "args": ["a"], "expect": 5},
+          {"method": "remaining", "args": ["b"], "expect": 0},
+          {"method": "cancel", "args": ["unknown"], "expect": false},
+          {"method": "reserve", "args": ["y", "a", 5], "expect": true},
+          {"method": "remaining", "args": ["a"], "expect": 0}
+        ]},
+        {"id": "p2-hidden-rejected-id", "constructor": [{"a": 1}], "commands": [
+          {"method": "reserve", "args": ["x", "a", 2], "expect": false},
+          {"method": "allocation", "args": ["x"], "expect": null},
+          {"method": "cancel", "args": ["x"], "expect": false},
+          {"method": "reserve", "args": ["x", "missing", 1], "raises": "out_of_range"},
+          {"method": "allocation", "args": ["x"], "expect": null},
+          {"method": "reserve", "args": ["x", "a", 1], "expect": true},
+          {"method": "cancel", "args": ["x"], "expect": true},
+          {"method": "remaining", "args": ["a"], "expect": 1}
+        ]},
+        {"id": "p2-hidden-large-restoration", "constructor": [{"a": 9223372036854775807}], "commands": [
+          {"method": "reserve", "args": ["x", "a", 9223372036854775807], "expect": true},
+          {"method": "cancel", "args": ["x"], "expect": true},
+          {"method": "cancel", "args": ["x"], "expect": false},
+          {"method": "remaining", "args": ["a"], "expect": 9223372036854775807},
+          {"method": "reserve", "args": ["x", "a", 9223372036854775807], "expect": true},
+          {"method": "allocation", "args": ["x"], "expect": {"a": 9223372036854775807}}
+        ]},
+        {"id": "p2-hidden-empty-ledger", "constructor": [{}], "commands": [
+          {"method": "cancel", "args": ["x"], "expect": false},
+          {"method": "allocation", "args": ["x"], "expect": null},
+          {"method": "cancel", "args": [""], "raises": "invalid_argument"},
+          {"method": "allocation", "args": [""], "raises": "invalid_argument"}
+        ]}
+      ],
+      "invariants": [
+        "All earlier conservation, uniqueness, isolation, and rejection invariants remain in force.",
+        "Canceling an active reservation restores exactly that reservation's units once; canceling an absent ID changes nothing.",
+        "After cancellation an ID is absent from queries and may be reserved again in any bay.",
+        "allocation is observational: repeated calls return equal fresh values, and caller mutation cannot change the reservation."
+      ],
+      "hints": [
+        "What facts about a reservation do you need when only its ID is supplied?",
+        "Store the bay and quantity together under each active ID. Use this record to restore space, and remove it exactly once.",
+        "For cancel, reject an empty ID, return false if absent, otherwise restore the recorded quantity and delete the record. For allocation, return a newly built one-entry map or null."
+      ],
+      "failure_question": "What should repeated cancellation and reuse of the same ID do to the ledger's conservation rule?"
+    },
+    {
+      "title": "Replace reservations atomically",
+      "prompt": "Keep all prior behavior. Add replace(cancel_ids: list[str], new_ids: list[str], bays: list[str], units: list[int]) -> bool. This is one atomic operation: cancel the listed active reservations and then create the zipped new reservations, using released space immediately. An ID may occur in both cancel_ids and new_ids, which replaces that booking. Validate the entire request before testing capacity, in this order: (1) unequal lengths among new_ids/bays/units, an empty ID in either ID list, a nonpositive unit value, or a duplicate within either ID list raises invalid_argument; (2) any unknown cancellation ID or bay raises out_of_range; (3) any new ID already active but not listed for cancellation raises invalid_argument. Duplicates across the two ID lists are allowed. Only after those checks, if the proposed final reservations exceed any bay's capacity return false and keep the entire original state. Otherwise apply all cancellations and additions and return true. Exceptions also preserve all state. An all-empty request returns true, as does a valid cancellation-only request. Adding requests in a different order cannot change success, final allocations, or availability. Never let a failed prefix consume space, remove an ID, or leave a canceled booking missing. Constructor capacities and individual quantities fit signed int64, but the sum of requested units might not: capacity checking must remain safe. Example: capacities {'a':2,'b':2}, with x occupying all of a and y all of b; replace(['x','y'],['x','y'],['b','a'],[2,2]) succeeds and swaps their bays even though neither bay initially had space. A simple copied trial state is acceptable; explain its complexity and discuss alternatives only if time permits.",
+      "public": [
+        {"id": "p3-public-swap", "constructor": [{"a": 2, "b": 2}], "commands": [
+          {"method": "reserve", "args": ["x", "a", 2], "expect": true},
+          {"method": "reserve", "args": ["y", "b", 2], "expect": true},
+          {"method": "replace", "args": [["x", "y"], ["x", "y"], ["b", "a"], [2, 2]], "expect": true},
+          {"method": "allocation", "args": ["x"], "expect": {"b": 2}},
+          {"method": "allocation", "args": ["y"], "expect": {"a": 2}},
+          {"method": "remaining", "args": ["a"], "expect": 0},
+          {"method": "remaining", "args": ["b"], "expect": 0}
+        ]},
+        {"id": "p3-public-rollback", "constructor": [{"a": 4, "b": 1}], "commands": [
+          {"method": "reserve", "args": ["x", "a", 4], "expect": true},
+          {"method": "replace", "args": [["x"], ["u", "v"], ["a", "b"], [4, 2]], "expect": false},
+          {"method": "allocation", "args": ["x"], "expect": {"a": 4}},
+          {"method": "allocation", "args": ["u"], "expect": null},
+          {"method": "remaining", "args": ["a"], "expect": 0},
+          {"method": "remaining", "args": ["b"], "expect": 1},
+          {"method": "replace", "args": [[], ["n", "n"], ["a", "b"], [1, 1]], "raises": "invalid_argument"},
+          {"method": "replace", "args": [["missing"], [], [], []], "raises": "out_of_range"}
+        ]}
+      ],
+      "hidden": [
+        {"id": "p3-hidden-empty-and-release", "constructor": [{"a": 3}], "commands": [
+          {"method": "replace", "args": [[], [], [], []], "expect": true},
+          {"method": "replace", "args": [[], ["x", "y"], ["a", "a"], [1, 2]], "expect": true},
+          {"method": "replace", "args": [["x", "y"], [], [], []], "expect": true},
+          {"method": "remaining", "args": ["a"], "expect": 3},
+          {"method": "allocation", "args": ["x"], "expect": null},
+          {"method": "cancel", "args": ["y"], "expect": false},
+          {"method": "reserve", "args": ["x", "a", 3], "expect": true}
+        ]},
+        {"id": "p3-hidden-validation", "constructor": [{"a": 5, "b": 1}], "commands": [
+          {"method": "reserve", "args": ["x", "a", 4], "expect": true},
+          {"method": "replace", "args": [["x"], ["n"], [], [1]], "raises": "invalid_argument"},
+          {"method": "replace", "args": [["x"], ["n"], ["a"], []], "raises": "invalid_argument"},
+          {"method": "replace", "args": [["x", "x"], [], [], []], "raises": "invalid_argument"},
+          {"method": "replace", "args": [[""], [], [], []], "raises": "invalid_argument"},
+          {"method": "replace", "args": [[], [""], ["a"], [1]], "raises": "invalid_argument"},
+          {"method": "replace", "args": [["x"], ["n"], ["b"], [0]], "raises": "invalid_argument"},
+          {"method": "replace", "args": [["x"], ["n"], ["b"], [-1]], "raises": "invalid_argument"},
+          {"method": "replace", "args": [[], ["x"], ["a"], [1]], "raises": "invalid_argument"},
+          {"method": "replace", "args": [["x"], ["n"], ["unknown"], [1]], "raises": "out_of_range"},
+          {"method": "allocation", "args": ["x"], "expect": {"a": 4}},
+          {"method": "allocation", "args": ["n"], "expect": null},
+          {"method": "remaining", "args": ["a"], "expect": 1},
+          {"method": "remaining", "args": ["b"], "expect": 1}
+        ]},
+        {"id": "p3-hidden-precedence", "constructor": [{"a": 1}], "commands": [
+          {"method": "reserve", "args": ["x", "a", 1], "expect": true},
+          {"method": "replace", "args": [["missing"], ["n", "n"], ["a", "a"], [1, 1]], "raises": "invalid_argument"},
+          {"method": "replace", "args": [[], ["n", "x"], ["a", "missing"], [2, 1]], "raises": "out_of_range"},
+          {"method": "replace", "args": [[], ["n", "x"], ["a", "a"], [2, 1]], "raises": "invalid_argument"},
+          {"method": "replace", "args": [["x", "missing"], ["n"], ["a"], [1]], "raises": "out_of_range"},
+          {"method": "allocation", "args": ["x"], "expect": {"a": 1}},
+          {"method": "remaining", "args": ["a"], "expect": 0}
+        ]},
+        {"id": "p3-hidden-aggregate-overflow", "constructor": [{"a": 9223372036854775807}], "commands": [
+          {"method": "reserve", "args": ["x", "a", 9223372036854775807], "expect": true},
+          {"method": "replace", "args": [["x"], ["u", "v"], ["a", "a"], [9223372036854775807, 9223372036854775807]], "expect": false},
+          {"method": "allocation", "args": ["x"], "expect": {"a": 9223372036854775807}},
+          {"method": "allocation", "args": ["u"], "expect": null},
+          {"method": "remaining", "args": ["a"], "expect": 0},
+          {"method": "replace", "args": [["x"], ["u", "v"], ["a", "a"], [9223372036854775806, 1]], "expect": true},
+          {"method": "cancel", "args": ["u"], "expect": true},
+          {"method": "remaining", "args": ["a"], "expect": 9223372036854775806},
+          {"method": "allocation", "args": ["v"], "expect": {"a": 1}}
+        ]},
+        {"id": "p3-hidden-aggregate-rollback", "constructor": [{"a": 5, "b": 2}], "commands": [
+          {"method": "reserve", "args": ["x", "a", 3], "expect": true},
+          {"method": "replace", "args": [["x"], ["u", "v"], ["a", "a"], [3, 3]], "expect": false},
+          {"method": "allocation", "args": ["x"], "expect": {"a": 3}},
+          {"method": "allocation", "args": ["u"], "expect": null},
+          {"method": "remaining", "args": ["a"], "expect": 2},
+          {"method": "replace", "args": [["x"], ["u", "v"], ["b", "a"], [2, 5]], "expect": true},
+          {"method": "allocation", "args": ["u"], "expect": {"b": 2}},
+          {"method": "allocation", "args": ["v"], "expect": {"a": 5}},
+          {"method": "allocation", "args": ["x"], "expect": null},
+          {"method": "cancel", "args": ["v"], "expect": true},
+          {"method": "reserve", "args": ["x", "a", 5], "expect": true}
+        ]}
+      ],
+      "invariants": [
+        "All earlier invariants remain true after every operation.",
+        "A replacement either commits its entire final state or leaves every old allocation, free-unit count, and ID unchanged.",
+        "Capacity is evaluated after all requested cancellations, including when a canceled ID is immediately reused.",
+        "Permuting cancellation IDs or permuting zipped additions does not change acceptance or final observable state.",
+        "All structural and existence validation precedes capacity checks; a capacity-short prefix cannot hide a specified exception later in the request.",
+        "Capacity arithmetic remains correct for signed-int64 inputs even when the mathematical sum of requests exceeds signed int64."
+      ],
+      "hints": [
+        "How could you decide whether the final ledger is valid without touching the live ledger?",
+        "Validate the whole request first. Try all cancellations and then all additions on copied availability; only publish changes if every bay fits.",
+        "Use a cancellation-ID set for uniqueness and allowed ID reuse. Add canceled quantities to copied free space, then compare each positive new quantity to that bay's remaining trial space before subtracting. On failure discard the copy; on success update IDs and replace free space."
+      ],
+      "failure_question": "If a multi-step request cannot complete, what observations would demonstrate that the original ledger was preserved?"
+    }
+  ],
+  "references": {"python": "reference.py", "cpp": "reference.cpp"}
+}

@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.interview-lab/
+.claude/settings.local.json
+.claude/settings.json
+.claude/.interview-lab-setup.lock
+*.zip

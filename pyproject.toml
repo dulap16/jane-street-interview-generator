@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "interview-lab"
+version = "1.0.0"
+description = "Local, evidence-oriented, multi-stage coding interview practice"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+interview-lab = "interview_lab.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["interview_lab*"]
+
+[tool.setuptools.package-data]
+interview_lab = ["*.hpp"]
