@@ -10,7 +10,7 @@ import statistics
 
 from .config import FAMILIES
 from .session import Lab, tick
-from .storage import LabError, atomic_json, digest, read_json, safe_child
+from .storage import LabError, atomic_bytes, digest, read_json, safe_child
 
 DIMENSIONS = ("understanding", "communication", "correctness", "clarity", "testing",
               "complexity", "adaptability", "language_fluency", "time_management")
@@ -83,7 +83,12 @@ def export_evidence(lab: Lab, session_id: str) -> dict:
         payload = evidence_payload(state)
         payload["evidence_digest"] = digest(payload)
         path = safe_child(lab.store.session(session_id), "evidence.json")
-        atomic_json(path, payload)
+        # Pretty-printed, not canonical(): a restrictive Read-only grader paginates by
+        # line, and a single minified line of a large export is otherwise unreadable.
+        # The digest above is computed over the canonical form, so it is unaffected by
+        # this file's on-disk formatting, and `debrief` recomputes it from state anyway.
+        atomic_bytes(path, (json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=True) + "\n")
+                     .encode("utf-8"))
         return {"path": str(path.relative_to(lab.root)), "evidence_digest": payload["evidence_digest"],
                 "notice": "No grade has been generated. Give this file and docs/rubric.md to a fresh grader."}
 
