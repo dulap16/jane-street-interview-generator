@@ -89,6 +89,13 @@ handoff. Do not open the complete pack or references in a candidate-facing
 conversation. An author who already knows them must still avoid disclosure.
 Local files are not an access-control system.
 
+`start` and `reveal` also (re)write `candidate/README.md` next to the source
+file with the cumulative revealed titles and prompts (the `problem_file` path
+in `status`/`context`/`show`). Point the candidate at that file instead of
+pasting the full prompt text into the conversation each time; a short verbal
+summary plus "open README.md" is enough. The file is generated, is never read
+by the test runner, and is not candidate code or narration.
+
 Start with an invitation such as “What would you clarify before implementing?”
 Do not demand narration when silent mode is chosen. A candidate may type
 `think ID TEXT` or `message ID TEXT` using the CLI to record reasoning.

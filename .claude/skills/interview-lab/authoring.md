@@ -5,6 +5,25 @@ Keep authoring files, whole packs, references, hidden fixtures, future prompts,
 and all unreleased hints out of candidate-facing context. Local privacy is a
 workflow convention, not a filesystem security guarantee.
 
+## Interview startup example
+
+Terminal 1 — Claude (this one, or a new claude session in this folder)
+source .venv312/bin/activate
+claude
+Then run /interview-lab and tell it what you want, e.g.:
+
+▎ Start a fresh 45-minute Python interview. I'd like to try the read-budget-cache problem again as a genuine first attempt — I've only seen it while testing the tool, not actually solved it.
+
+Since I deleted practice-01/practice-02, I (via the skill) will prepare and start a new session id against the existing .interview-lab/authoring/read-budget-cache/pack.json, ask you to confirm familiarity honestly, and give you the solution-file path plus the exact session-specific watch command.
+
+Terminal 2 — the timer
+Open a second terminal in the same folder:
+source .venv312/bin/activate
+python -m interview_lab watch <session-id>
+<session-id> is whatever id gets picked in terminal 1 (e.g. practice-03) — leave this running for the live countdown; Ctrl+C only stops the display, not the clock.
+
+Then edit the solution file in your editor, save, and tell Claude "I'm done with this part" when ready to test.
+
 ## Design a genuinely different task
 
 Use the chosen family and seed to propose a new state model or grammar, a small
@@ -29,6 +48,25 @@ methods, but must not silently change their contract. If a change is intentional
 make the new rule explicit and ensure the earlier fixtures remain coherent.
 Reward reasonable adaptation, not clairvoyance or an abstract framework built
 for a future prompt the candidate has not seen.
+
+Favor an initial design where a single obvious collection is not simply
+sufficient throughout. If a plain dict/list satisfies the first part *and*
+every later extension without ever being reconsidered, the exercise likely has
+a shallow ceiling regardless of part count: each "extension" ends up being one
+more validation branch on the same representation rather than a real design
+decision. Prefer a first part whose reasonable solutions already trade off
+against each other (for example, needing both fast lookup and an ordering or
+eviction property together), and at least one extension that plausibly forces
+revisiting or augmenting that structure, not just adding another guarded
+method beside it.
+
+Do not multiply the same trivial validation rule across many methods as if
+that were additional test coverage. A single one-line guard (an empty string,
+a non-positive count) repeated verbatim across four or five methods tests
+whether the candidate remembered to paste it everywhere, not engineering
+judgment. State such a rule once, illustrate it clearly for the method it
+first matters on, and spend the rest of the public/hidden fixture budget on
+rules that exercise real behavior, ordering, or interaction between methods.
 
 Design for a clear, useful abstraction and productive discussion of tradeoffs,
 not a concealed optimal trick. Provide room for thoughtful clarification and

@@ -108,6 +108,7 @@ See [configuration details](DEVELOPMENT.md#configuration) for all options.
 
 ## Help and important limits
 
+[A worked example, start to finish](docs/walkthrough.md) ·
 [Setup troubleshooting](docs/troubleshooting.md) ·
 [Claude integration details](docs/claude-integration.md) ·
 [Developer guide and manual commands](DEVELOPMENT.md)

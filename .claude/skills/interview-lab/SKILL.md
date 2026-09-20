@@ -96,7 +96,10 @@ into it. Never invent a familiarity answer to enable scored trends.
 
 - Use `show ID` and `context ID`; reveal only the active stage's prompt,
   cumulative API, and public examples. Do not expose the pack, later method
-  names, future tests, hidden fixtures, or complete references.
+  names, future tests, hidden fixtures, or complete references. `start` and
+  `reveal` write the same revealed prompts to `candidate/README.md` next to
+  the solution file; point the candidate there instead of pasting the full
+  prompt text into the conversation on each part.
 - Invite clarification and a simple first design. Discuss tradeoffs without
   insisting on a specific data structure or preempting unrevealed extensions.
   Help identify an abstraction that makes the current task clear and supports
